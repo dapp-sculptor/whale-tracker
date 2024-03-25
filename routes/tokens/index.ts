@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import { DEX_API_URL, connection } from "../../config/config";
 import { getTopTradersList, isValidSolanaAddress } from "../../utils";
+import { IPair } from "../../utils/types";
 
 
 // Create a new instance of the Express Router
@@ -86,16 +87,30 @@ Token.get("/topholders", async (req: Request, res: Response) => {
 // @access   Public
 Token.get("/toptraders", async (req: Request, res: Response) => {
   try {
-    const address = req.query.pair
-    if (typeof address !== 'string') {
+    const token = req.query.token
+    if (typeof token !== 'string') {
       return res.status(400).json({ error: 'Base token must be a string' });
     }
-    if (!isValidSolanaAddress(address)) return res.status(400).json({ error: 'Invalid Base Token address' });
+    if (!isValidSolanaAddress(token)) return res.status(400).json({ error: 'Invalid Base Token address' });
 
-    const result = await axios.get(`${DEX_API_URL}/pairs/solana/${address}`)
-    const pairData = result.data.pair.pairAddress
+    const pairsData = await axios.get(`${DEX_API_URL}/tokens/${token}`)
+    const pairsList = pairsData.data.pairs
+    const raydiumPools = pairsList.filter((item: any) => (item.dexId === "raydium"))
+    const filtered:IPair[] = raydiumPools.map((item: any) => ({
+      pairAddress: item.pairAddress,
+      baseToken: {
+        address: item.baseToken.address,
+        name: item.baseToken.name,
+        symbol: item.baseToken.symbol
+      },
+      quoteToken: {
+        address: item.quoteToken.address,
+        name: item.quoteToken.name,
+        symbol: item.quoteToken.symbol
+      }
+    }));
 
-    const data = await getTopTradersList(pairData)
+    const data = await getTopTradersList(filtered)
     res.json(data)
   } catch (error: any) {
     console.error(error);
